@@ -1,0 +1,46 @@
+# Ansible
+*.retry
+.ansible/
+*.vault
+
+# Credentials and secrets
+configs/azure_credentials.yml
+configs/azure_subscription.txt
+configs/*.key
+configs/*.pem
+
+# SSH Keys
+!*.pub
+*.pem
+*.key
+!.ssh/*.pub
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp

@@ -1,0 +1,20 @@
+# Ansible Inventory for Azure IaaS VM Deployment Testing
+# Define your Azure VMs here
+
+[azure_dev]
+# dev_vm ansible_host=<dev_vm_ip> ansible_port=22
+
+[azure_staging]
+# staging_vm ansible_host=<staging_vm_ip> ansible_port=22
+
+[azure_prod]
+# prod_vm ansible_host=<prod_vm_ip> ansible_port=22
+
+[azure_vms:children]
+azure_dev
+azure_staging
+azure_prod
+
+[azure_vms:vars]
+ansible_user=azureuser
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'

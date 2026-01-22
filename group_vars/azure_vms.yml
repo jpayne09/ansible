@@ -1,0 +1,23 @@
+---
+# Group variables for all Azure VMs
+
+# Azure subscription details (load from configs)
+azure_subscription_id: "{{ lookup('file', 'configs/azure_subscription.txt') if ansible_os_family is defined else '' }}"
+
+# VM deployment defaults
+vm_admin_user: azureuser
+vm_ssh_key_path: ~/.ssh/id_rsa
+vm_os_disk_size_gb: 30
+vm_data_disk_size_gb: 128
+
+# Network settings
+enable_monitoring: yes
+enable_diagnostics: yes
+
+# Resource naming
+resource_prefix: "ansible-test"
+environment: "dev"
+
+# Ansible user for VM configuration
+ansible_user: azureuser
+ansible_ssh_private_key_file: ~/.ssh/id_rsa

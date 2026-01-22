@@ -1,0 +1,112 @@
+---
+# Tasks for deploying Azure VMs
+
+- name: Ensure Azure collection is available
+  block:
+    - name: Check for azure.azcollection
+      debug:
+        msg: "Azure collection will be used for deployment"
+  
+- name: Create resource group
+  azure.azcollection.azure_rm_resourcegroup:
+    name: "{{ azure_resource_group }}"
+    location: "{{ azure_region }}"
+    tags: "{{ default_tags }}"
+    state: "{{ vm_state }}"
+  register: rg_output
+
+- name: Create virtual network
+  azure.azcollection.azure_rm_virtualnetwork:
+    resource_group: "{{ azure_resource_group }}"
+    name: "{{ virtual_network_name }}"
+    address_prefixes_cidr:
+      - "10.0.0.0/16"
+    state: "{{ vm_state }}"
+  register: vnet_output
+
+- name: Create subnet
+  azure.azcollection.azure_rm_subnet:
+    resource_group: "{{ azure_resource_group }}"
+    virtual_network_name: "{{ virtual_network_name }}"
+    name: "{{ subnet_name }}"
+    address_prefix_cidr: "10.0.1.0/24"
+    state: "{{ vm_state }}"
+  register: subnet_output
+
+- name: Create network security group
+  azure.azcollection.azure_rm_securitygroup:
+    resource_group: "{{ azure_resource_group }}"
+    name: "{{ security_group_name }}"
+    rules:
+      - name: AllowSSH
+        protocol: Tcp
+        destination_port_range: 22
+        access: Allow
+        priority: 100
+        direction: Inbound
+      - name: AllowHTTP
+        protocol: Tcp
+        destination_port_range: 80
+        access: Allow
+        priority: 101
+        direction: Inbound
+      - name: AllowHTTPS
+        protocol: Tcp
+        destination_port_range: 443
+        access: Allow
+        priority: 102
+        direction: Inbound
+    state: "{{ vm_state }}"
+  register: nsg_output
+
+- name: Create public IP address
+  azure.azcollection.azure_rm_publicipaddress:
+    resource_group: "{{ azure_resource_group }}"
+    name: "{{ public_ip_name }}"
+    allocation_method: "Static"
+    state: "{{ vm_state }}"
+  register: pip_output
+
+- name: Create network interface
+  azure.azcollection.azure_rm_networkinterface:
+    resource_group: "{{ azure_resource_group }}"
+    name: "{{ network_interface_name }}"
+    virtual_network_name: "{{ virtual_network_name }}"
+    subnet_name: "{{ subnet_name }}"
+    security_group_name: "{{ security_group_name }}"
+    ip_configurations:
+      - name: ipconfig1
+        primary: true
+        public_ip_address_name: "{{ public_ip_name }}"
+    state: "{{ vm_state }}"
+  register: nic_output
+
+- name: Create virtual machine
+  azure.azcollection.azure_rm_virtualmachine:
+    resource_group: "{{ azure_resource_group }}"
+    name: "{{ vm_name }}"
+    vm_size: "{{ vm_size }}"
+    admin_username: "{{ vm_admin_user }}"
+    ssh_public_keys:
+      - path: "/home/{{ vm_admin_user }}/.ssh/authorized_keys"
+        key_data: "{{ lookup('file', vm_ssh_key_path + '.pub') }}"
+    image:
+      offer: "{{ vm_image_offer }}"
+      publisher: "{{ vm_image_publisher }}"
+      sku: "{{ vm_image_sku }}"
+      version: "{{ vm_image_version }}"
+    network_interfaces: "{{ network_interface_name }}"
+    managed_disk_type: "Premium_LRS"
+    os_disk_size_gb: "{{ vm_os_disk_size_gb }}"
+    tags: "{{ default_tags }}"
+    state: "{{ vm_state }}"
+  register: vm_output
+
+- name: Display deployment output
+  debug:
+    msg: |
+      VM Deployment Summary:
+      - Resource Group: {{ azure_resource_group }}
+      - VM Name: {{ vm_name }}
+      - Public IP: {{ pip_output.state.ip_address | default('Pending') }}
+      - Admin User: {{ vm_admin_user }}
