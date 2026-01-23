@@ -12,7 +12,7 @@ azure_region: "eastus2"
 
 # Virtual Machine Configuration
 vm_name: "JPTEST784hj"
-vm_size: "Standard_D2S_v3"
+vm_size: "Standard_D2s_v3"
 vm_admin_user: "azureuser"
 vm_admin_password: "P@ssw0rd1234!"
 vm_os_disk_size_gb: 128
