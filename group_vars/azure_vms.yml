@@ -1,9 +1,10 @@
 ---
-# Azure Credentials
-azure_subscription_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'subscription_id') | map(attribute='value') | first }}"
-azure_client_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'client_id') | map(attribute='value') | first }}"
-azure_client_secret: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'client_secret') | map(attribute='value') | first }}"
-azure_tenant_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'tenant_id') | map(attribute='value') | first }}"
+# Azure Credentials - Tower injects these automatically
+# If running locally, falls back to environment or file
+azure_subscription_id: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
+azure_client_id: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
+azure_client_secret: "{{ lookup('env', 'AZURE_CLIENT_SECRET') }}"
+azure_tenant_id: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
 
 # Azure Resource Configuration
 azure_resource_group: "rg-simple-vm"
