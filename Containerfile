@@ -81,5 +81,14 @@ RUN pip install --no-cache-dir --ignore-installed \
 COPY requirements.yml /tmp/requirements.yml
 RUN ansible-galaxy collection install -r /tmp/requirements.yml
 
+# Find and install collection's Python dependencies
+RUN COLLECTION_PATH=$(find / -name "azcollection" -type d 2>/dev/null | grep "ansible_collections/azure/azcollection" | head -1) && \
+    echo "Found collection at: $COLLECTION_PATH" && \
+    if [ -f "$COLLECTION_PATH/requirements.txt" ]; then \
+        pip install --no-cache-dir -r "$COLLECTION_PATH/requirements.txt"; \
+    else \
+        echo "Warning: requirements.txt not found in collection"; \
+    fi
+
 # Verify installations
 RUN az --version && ansible --version && ansible-galaxy collection list | grep azure
