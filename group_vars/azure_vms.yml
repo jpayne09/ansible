@@ -1,23 +1,35 @@
 ---
-# Group variables for all Azure VMs
+# Azure Credentials
+azure_subscription_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'subscription_id') | map(attribute='value') | first }}"
+azure_client_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'client_id') | map(attribute='value') | first }}"
+azure_client_secret: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'client_secret') | map(attribute='value') | first }}"
+azure_tenant_id: "{{ lookup('file', 'configs/credentials.yml') | from_yaml | dict2items | selectattr('key', 'equalto', 'tenant_id') | map(attribute='value') | first }}"
 
-# Azure subscription details (load from configs)
-azure_subscription_id: "{{ lookup('file', 'configs/azure_subscription.txt') if ansible_os_family is defined else '' }}"
+# Azure Resource Configuration
+azure_resource_group: "rg-simple-vm"
+azure_region: "eastus"
 
-# VM deployment defaults
-vm_admin_user: azureuser
-vm_ssh_key_path: ~/.ssh/id_rsa
+# Virtual Machine Configuration
+vm_name: "simple-vmfffff"
+vm_size: "Standard_B2s"
+vm_admin_user: "azureuser"
+vm_admin_password: "P@ssw0rd1234!"
 vm_os_disk_size_gb: 30
-vm_data_disk_size_gb: 128
 
-# Network settings
-enable_monitoring: yes
-enable_diagnostics: yes
+# VM Image Configuration
+vm_image_publisher: "MicrosoftWindowsServer"
+vm_image_offer: "WindowsServer"
+vm_image_sku: "2022-Datacenter"
+vm_image_version: "latest"
 
-# Resource naming
-resource_prefix: "ansible-test"
-environment: "dev"
+# Network Configuration
+virtual_network_name: "vnet-simple"
+subnet_name: "subnet-default"
+nsg_name: "nsg-simple"
+public_ip_name: "pip-simple-vm"
+nic_name: "nic-simple-vm"
 
-# Ansible user for VM configuration
-ansible_user: azureuser
-ansible_ssh_private_key_file: ~/.ssh/id_rsa
+# Ansible settings (WinRM for Windows)
+ansible_connection: winrm
+ansible_winrm_transport: basic
+ansible_port: 5985

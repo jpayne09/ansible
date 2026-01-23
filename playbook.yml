@@ -1,0 +1,100 @@
+---
+- name: Deploy Simple Azure VM
+  hosts: localhost
+  gather_facts: false
+  
+  vars_files:
+    - group_vars/all.yml
+  
+  tasks:
+    - name: Authenticate to Azure using Service Principal
+      shell:
+        cmd: |
+          az login --service-principal \
+            -u "{{ azure_client_id }}" \
+            -p "{{ azure_client_secret }}" \
+            --tenant "{{ azure_tenant_id }}"
+      no_log: true
+
+    - name: Set Azure subscription
+      shell: |
+        az account set --subscription "{{ azure_subscription_id }}"
+
+    - name: Create resource group
+      shell: |
+        az group create \
+          --name "{{ azure_resource_group }}" \
+          --location "{{ azure_region }}"
+
+    - name: Create virtual network
+      shell: |
+        az network vnet create \
+          --resource-group "{{ azure_resource_group }}" \
+          --name "{{ virtual_network_name }}" \
+          --address-prefix 10.0.0.0/16 \
+          --subnet-name "{{ subnet_name }}" \
+          --subnet-prefix 10.0.1.0/24
+
+    - name: Create network security group
+      shell: |
+        az network nsg create \
+          --resource-group "{{ azure_resource_group }}" \
+          --name "{{ nsg_name }}"
+
+    - name: Add RDP rule to NSG
+      shell: |
+        az network nsg rule create \
+          --resource-group "{{ azure_resource_group }}" \
+          --nsg-name "{{ nsg_name }}" \
+          --name "AllowRDP" \
+          --priority 1000 \
+          --source-address-prefixes '*' \
+          --source-port-ranges '*' \
+          --destination-address-prefixes '*' \
+          --destination-port-ranges 3389 \
+          --access Allow \
+          --protocol Tcp
+
+    - name: Create public IP address
+      shell: |
+        az network public-ip create \
+          --resource-group "{{ azure_resource_group }}" \
+          --name "{{ public_ip_name }}"
+
+    - name: Create network interface
+      shell: |
+        az network nic create \
+          --resource-group "{{ azure_resource_group }}" \
+          --name "{{ nic_name }}" \
+          --vnet-name "{{ virtual_network_name }}" \
+          --subnet "{{ subnet_name }}" \
+          --public-ip-address "{{ public_ip_name }}" \
+          --network-security-group "{{ nsg_name }}"
+
+    - name: Create virtual machine
+      shell: |
+        az vm create \
+          --resource-group "{{ azure_resource_group }}" \
+          --name "{{ vm_name }}" \
+          --nics "{{ nic_name }}" \
+          --image "{{ vm_image_publisher }}:{{ vm_image_offer }}:{{ vm_image_sku }}:{{ vm_image_version }}" \
+          --size "{{ vm_size }}" \
+          --admin-username "{{ vm_admin_user }}" \
+          --admin-password "{{ vm_admin_password }}" \
+          --os-disk-size-gb "{{ vm_os_disk_size_gb }}"
+      register: vm_result
+
+    - name: Display VM information
+      debug:
+        msg: |
+          ✓ Windows VM Deployment Complete!
+          
+          Resource Group: {{ azure_resource_group }}
+          VM Name: {{ vm_name }}
+          Location: {{ azure_region }}
+          Size: {{ vm_size }}
+          Admin User: {{ vm_admin_user }}
+          
+          To connect to the VM:
+          - Get public IP: az vm show -d --resource-group {{ azure_resource_group }} --name {{ vm_name }} --query publicIps -o tsv
+          - RDP: Connect to <PUBLIC_IP>:3389 with username {{ vm_admin_user }} and password {{ vm_admin_password }}
