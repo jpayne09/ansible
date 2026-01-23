@@ -2,3 +2,4 @@
 ansible>=2.9.0
 azure-cli>=2.30.0
 requests>=2.25.0
+azure.azcollection
