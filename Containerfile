@@ -3,8 +3,8 @@ FROM quay.io/ansible/creator-ee:latest
 # Install system dependencies
 USER root
 
-# Install Azure CLI and base Azure SDK
-RUN pip install --no-cache-dir azure-cli 'ansible[azure]' 'azure>=2.0.0'
+# Install Azure CLI
+RUN pip install --no-cache-dir azure-cli
 
 # Install Python dependencies from requirements.txt
 COPY requirements.txt /tmp/requirements.txt

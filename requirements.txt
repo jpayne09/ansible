@@ -1,6 +1,5 @@
 # Ansible Azure Deployment Requirements
-ansible[azure]>=2.9.0
-azure>=2.0.0
+ansible>=2.9.0
 requests>=2.25.0
 packaging
 azure-cli-core
