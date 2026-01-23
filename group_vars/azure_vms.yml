@@ -7,7 +7,7 @@ azure_client_secret: "{{ lookup('env', 'AZURE_CLIENT_SECRET') }}"
 azure_tenant_id: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
 
 # Azure Resource Configuration
-azure_resource_group: "rg-simple-vm"
+azure_resource_group: "rg-simple-vm2"
 azure_region: "eastus2"
 
 # Virtual Machine Configuration
