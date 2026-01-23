@@ -16,12 +16,14 @@
 
     - name: Create resource group
       azure.azcollection.azure_rm_resourcegroup:
+        subscription_id: "{{ azure_subscription_id }}"
         name: "{{ azure_resource_group }}"
         location: "{{ azure_region }}"
       register: rg_result
 
     - name: Create virtual network
       azure.azcollection.azure_rm_virtualnetwork:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ virtual_network_name }}"
         address_prefixes_cidr:
@@ -29,6 +31,7 @@
 
     - name: Create subnet
       azure.azcollection.azure_rm_subnet:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         virtual_network_name: "{{ virtual_network_name }}"
         name: "{{ subnet_name }}"
@@ -36,6 +39,7 @@
 
     - name: Create network security group
       azure.azcollection.azure_rm_securitygroup:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ nsg_name }}"
         rules:
@@ -54,6 +58,7 @@
 
     - name: Create public IP address
       azure.azcollection.azure_rm_publicipaddress:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ public_ip_name }}"
         allocation_method: "Static"
@@ -61,6 +66,7 @@
 
     - name: Create network interface
       azure.azcollection.azure_rm_networkinterface:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ nic_name }}"
         virtual_network_name: "{{ virtual_network_name }}"
@@ -74,6 +80,7 @@
 
     - name: Create virtual machine
       azure.azcollection.azure_rm_virtualmachine:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ vm_name }}"
         vm_size: "{{ vm_size }}"
@@ -92,6 +99,7 @@
 
     - name: Get VM public IP
       azure.azcollection.azure_rm_publicipaddress_info:
+        subscription_id: "{{ azure_subscription_id }}"
         resource_group: "{{ azure_resource_group }}"
         name: "{{ public_ip_name }}"
       register: public_ip_info
