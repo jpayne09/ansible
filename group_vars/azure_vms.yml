@@ -30,7 +30,6 @@ nsg_name: "nsg-simple"
 public_ip_name: "pip-simple-vm"
 nic_name: "nic-simple-vm"
 
-# Ansible settings (WinRM for Windows)
-ansible_connection: winrm
-ansible_winrm_transport: basic
-ansible_port: 5985
+# Ansible settings
+# NOTE: WinRM is only for connecting to deployed Windows VMs
+# Local execution uses SSH/shell
