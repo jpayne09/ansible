@@ -80,6 +80,7 @@
         admin_username: "{{ vm_admin_user }}"
         admin_password: "{{ vm_admin_password }}"
         network_interfaces: "{{ nic_name }}"
+        os_type: Windows
         image:
           offer: "{{ vm_image_offer }}"
           publisher: "{{ vm_image_publisher }}"
