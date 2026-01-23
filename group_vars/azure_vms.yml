@@ -1,10 +1,14 @@
 ---
-# Azure Credentials - Tower injects these automatically
-# If running locally, falls back to environment or file
-azure_subscription_id: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
+# Azure Credentials - Tower injects these automatically via environment variables
+# Override by setting these variables in AAP Job Template Extra Variables
+# Credentials are loaded from environment by default
 azure_client_id: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
 azure_client_secret: "{{ lookup('env', 'AZURE_CLIENT_SECRET') }}"
 azure_tenant_id: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
+
+# Subscription ID - defaults to Tower credential, but can be overridden
+# Set azure_subscription_id in AAP Extra Variables to deploy to different subscription
+azure_subscription_id: "{{ override_azure_subscription_id | default(lookup('env', 'AZURE_SUBSCRIPTION_ID')) }}"
 
 # Azure Resource Configuration
 azure_resource_group: "rg-simple-vm2"
