@@ -20,7 +20,6 @@
         AZURE_CLIENT_SECRET: "{{ azure_client_secret }}"
         AZURE_TENANT_ID: "{{ azure_tenant_id }}"
       register: auth_result
-      ignore_errors: yes
 
     - name: Debug - Check credentials loaded from Tower
       debug:
@@ -28,12 +27,13 @@
           Subscription ID: {{ azure_subscription_id | default('NOT SET') }}
           Client ID: {{ azure_client_id | default('NOT SET') }}
           Tenant ID: {{ azure_tenant_id | default('NOT SET') }}
-      when: azure_subscription_id is defined or azure_client_id is defined
+          Auth result RC: {{ auth_result.rc | default('N/A') }}
+          Auth result stdout: {{ auth_result.stdout | default('N/A') }}
 
     - name: Check authentication result
       fail:
-        msg: "Azure authentication failed: {{ auth_result.stderr | default(auth_result.stdout) }}"
-      when: auth_result.rc != 0
+        msg: "Azure authentication failed: {{ auth_result.stderr }}"
+      when: auth_result.rc is defined and auth_result.rc != 0
 
     - name: Set Azure subscription
       shell: |
