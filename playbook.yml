@@ -34,6 +34,8 @@
       fail:
         msg: "Azure authentication failed: {{ auth_result.stderr | default(auth_result.stdout) }}"
       when: auth_result.rc != 0
+
+    - name: Set Azure subscription
       shell: |
         az account set --subscription "{{ azure_subscription_id }}"
 
