@@ -11,6 +11,11 @@
   hosts: "{{ target_host | default('aws_windows') }}"
   gather_facts: false
 
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/aws_defaults.yml
+    - ../group_vars/all/credentials.yml
+
   vars:
     ansible_connection: winrm
     ansible_winrm_transport: basic
@@ -53,6 +58,11 @@
   hosts: "{{ target_linux_host | default('aws_linux') }}"
   gather_facts: true
   become: true
+
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/aws_defaults.yml
+    - ../group_vars/all/credentials.yml
 
   vars:
     ansible_connection: ssh

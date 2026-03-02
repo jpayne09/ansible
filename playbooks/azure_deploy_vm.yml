@@ -3,6 +3,11 @@
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/azure_defaults.yml
+    - ../group_vars/all/credentials.yml
+
   tasks:
     - name: Debug - Check credentials loaded from AWX
       ansible.builtin.debug:

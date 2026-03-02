@@ -23,6 +23,12 @@
   gather_facts: false
   connection: local
 
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/aws_defaults.yml
+    - ../group_vars/all/credentials.yml
+    - ../group_vars/all/instances.yml
+
   # ── STS Assume Role (conditional) ──────────────────────────────────
   pre_tasks:
     - name: Assume AWS STS role

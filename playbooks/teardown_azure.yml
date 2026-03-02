@@ -9,6 +9,11 @@
   gather_facts: false
   connection: local
 
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/azure_defaults.yml
+    - ../group_vars/all/credentials.yml
+
   vars:
     confirm_destroy: "no"
 

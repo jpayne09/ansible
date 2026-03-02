@@ -9,6 +9,10 @@
   gather_facts: false
   connection: local
 
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/aws_defaults.yml
+
   vars:
     confirm_destroy: "yes"
 
