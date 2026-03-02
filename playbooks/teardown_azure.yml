@@ -1,0 +1,44 @@
+---
+# Teardown Azure resources created by azure_deploy_vm.yml
+#
+# Usage:
+#   ansible-playbook playbooks/teardown_azure.yml -e "confirm_destroy=yes"
+
+- name: Teardown Azure Resources
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars_files:
+    - ../group_vars/azure_vms.yml
+
+  vars:
+    confirm_destroy: "no"
+
+  tasks:
+    - name: Safety check - require explicit confirmation
+      ansible.builtin.fail:
+        msg: |
+          SAFETY CHECK FAILED!
+          You must pass -e "confirm_destroy=yes" to run this playbook.
+          This will PERMANENTLY DELETE all Azure lab resources.
+      when: confirm_destroy != "yes"
+
+    - name: Delete resource group (cascades all resources)
+      azure.azcollection.azure_rm_resourcegroup:
+        subscription_id: "{{ azure_subscription_id }}"
+        name: "{{ azure_resource_group }}"
+        state: absent
+        force_delete_nonempty: true
+      ignore_errors: true
+
+    - name: Teardown summary
+      ansible.builtin.debug:
+        msg: |
+          Azure Teardown Complete
+
+          Resources destroyed:
+            - Resource group: {{ azure_resource_group }} (all nested resources)
+              - VNet, subnet, NSG, public IP, NIC, VM — all cascade-deleted
+
+          Note: Deletion may have been skipped if the resource group didn't exist.
