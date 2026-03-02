@@ -1,39 +1,32 @@
 ---
-# Azure Credentials - Tower injects these automatically via environment variables
-# Override by setting these variables in AAP Job Template Extra Variables
-# Credentials are loaded from environment by default
+# Azure defaults - base configuration inherited by all environments
+
+# Credentials - injected by AWX Microsoft Azure RM credential type
 azure_client_id: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
 azure_client_secret: "{{ lookup('env', 'AZURE_CLIENT_SECRET') }}"
 azure_tenant_id: "{{ lookup('env', 'AZURE_TENANT_ID') }}"
-
-# Subscription ID - defaults to Tower credential, but can be overridden
-# Set azure_subscription_id in AAP Extra Variables to deploy to different subscription
 azure_subscription_id: "{{ override_azure_subscription_id | default(lookup('env', 'AZURE_SUBSCRIPTION_ID')) }}"
 
-# Azure Resource Configuration
+# Resource configuration
 azure_resource_group: "rg-simple-vm2"
 azure_region: "eastus2"
 
-# Virtual Machine Configuration
+# VM defaults
 vm_name: "JPTEST784hj"
 vm_size: "Standard_D2s_v3"
 vm_admin_user: "azureuser"
-vm_admin_password: "P@ssw0rd1234!"
+vm_admin_password: "{{ vault_azure_vm_admin_password | default('P@ssw0rd1234!') }}"
 vm_os_disk_size_gb: 128
 
-# VM Image Configuration
+# Image defaults
 vm_image_publisher: "MicrosoftWindowsServer"
 vm_image_offer: "WindowsServer"
 vm_image_sku: "2022-Datacenter"
 vm_image_version: "latest"
 
-# Network Configuration
+# Network defaults
 virtual_network_name: "vnet-simple"
 subnet_name: "subnet-default"
 nsg_name: "nsg-simple"
 public_ip_name: "pip-simple-vm"
 nic_name: "nic-simple-vm"
-
-# Ansible settings
-# NOTE: WinRM is only for connecting to deployed Windows VMs
-# Local execution uses SSH/shell

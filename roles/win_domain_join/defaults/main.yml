@@ -1,0 +1,8 @@
+---
+# win_domain_join role defaults
+
+domain_name: "lab.local"
+domain_admin_user: "LABLOCAL\\admin"
+domain_admin_password: ""
+domain_ou_path: "OU=Servers,DC=lab,DC=local"
+domain_controller_ip: ""

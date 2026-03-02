@@ -1,0 +1,7 @@
+---
+# linux_post_deploy role defaults
+
+domain_name: "lab.local"
+domain_admin_user: "admin"
+domain_admin_password: ""
+domain_controller_ip: ""

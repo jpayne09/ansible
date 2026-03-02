@@ -184,9 +184,3 @@
       Timestamp: {{ ansible_date_time.iso8601 }}
     dest: /var/log/ansible/deployment_receipt.txt
     mode: "0644"
-
-handlers:
-  - name: Restart SSH
-    ansible.builtin.service:
-      name: ssh
-      state: restarted

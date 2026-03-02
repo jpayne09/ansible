@@ -1,0 +1,66 @@
+---
+# VPC, Subnet, IGW, Route Table, Security Group
+
+- name: Create VPC
+  amazon.aws.ec2_vpc_net:
+    name: "{{ aws_vpc_name }}"
+    cidr_block: "{{ aws_vpc_cidr }}"
+    region: "{{ aws_region }}"
+    state: present
+    tags: "{{ ec2_tags }}"
+  register: vpc_result
+
+- name: Create subnet
+  amazon.aws.ec2_vpc_subnet:
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    cidr: "{{ aws_subnet_cidr }}"
+    region: "{{ aws_region }}"
+    az: "{{ aws_region }}a"
+    map_public: true
+    state: present
+    tags: "{{ ec2_tags | combine({'Name': aws_subnet_name}) }}"
+  register: subnet_result
+
+- name: Create internet gateway
+  amazon.aws.ec2_vpc_igw:
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    region: "{{ aws_region }}"
+    state: present
+    tags: "{{ ec2_tags | combine({'Name': aws_igw_name}) }}"
+  register: igw_result
+
+- name: Create route table with internet access
+  amazon.aws.ec2_vpc_route_table:
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    region: "{{ aws_region }}"
+    subnets:
+      - "{{ subnet_result.subnet.id }}"
+    routes:
+      - dest: "0.0.0.0/0"
+        gateway_id: "{{ igw_result.gateway_id }}"
+    tags: "{{ ec2_tags | combine({'Name': aws_route_table_name}) }}"
+
+- name: Create security group
+  amazon.aws.ec2_security_group:
+    name: "{{ aws_security_group_name }}"
+    description: "Ansible Lab - RDP, WinRM, SSH access"
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp
+        from_port: 3389
+        to_port: 3389
+        cidr_ip: "0.0.0.0/0"
+        rule_desc: "RDP"
+      - proto: tcp
+        from_port: 5985
+        to_port: 5986
+        cidr_ip: "0.0.0.0/0"
+        rule_desc: "WinRM HTTP/HTTPS"
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: "0.0.0.0/0"
+        rule_desc: "SSH"
+    tags: "{{ ec2_tags }}"
+  register: sg_result

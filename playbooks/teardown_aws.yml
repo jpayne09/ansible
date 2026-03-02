@@ -9,9 +9,6 @@
   gather_facts: false
   connection: local
 
-  vars_files:
-    - ../group_vars/Test-team/aws_ec2.yml
-
   vars:
     confirm_destroy: "yes"
 

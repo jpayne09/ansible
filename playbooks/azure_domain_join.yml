@@ -12,9 +12,6 @@
   hosts: "{{ target_host | default('azure_windows') }}"
   gather_facts: false
 
-  vars_files:
-    - ../group_vars/azure_vms.yml
-
   vars:
     # Domain configuration — override via AWX extra vars or survey
     domain_name: "lab.local"

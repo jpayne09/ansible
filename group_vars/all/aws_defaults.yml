@@ -1,0 +1,33 @@
+---
+# AWS defaults - base configuration inherited by all environments
+
+# STS Assume Role Configuration
+# Set aws_use_sts: true and provide a role ARN to use STS
+# Set aws_use_sts: false to use direct credentials or instance profile
+aws_use_sts: false
+aws_sts_role_arn: "{{ vault_aws_sts_role_arn | default(lookup('env', 'AWS_STS_ROLE_ARN') | default('', true)) }}"
+aws_sts_session_name: "ansible-awx-{{ lookup('env', 'AWX_JOB_ID') | default('cli', true) }}"
+aws_sts_duration_seconds: 3600
+aws_sts_external_id: ""
+
+# Region
+aws_region: "us-east-1"
+
+# Networking defaults
+aws_vpc_cidr: "10.1.0.0/16"
+aws_subnet_cidr: "10.1.1.0/24"
+aws_vpc_name: "{{ resource_prefix }}-vpc"
+aws_subnet_name: "{{ resource_prefix }}-subnet"
+aws_igw_name: "{{ resource_prefix }}-igw"
+aws_route_table_name: "{{ resource_prefix }}-rt"
+aws_security_group_name: "{{ resource_prefix }}-sg"
+
+# Key pair
+ec2_key_pair_name: "{{ resource_prefix }}-key"
+
+# Windows admin credentials
+ec2_win_admin_user: "Administrator"
+ec2_win_admin_password: "{{ vault_ec2_win_admin_password | default('P@ssw0rd1234!') }}"
+
+# Tags (merge common + AWS-specific)
+ec2_tags: "{{ common_tags | combine({'Provider': 'AWS'}) }}"

@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: win_domain_join
+  author: Ansible AWX
+  description: Joins Windows servers to AD domain (or simulates for lab)
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Windows
+      versions: [2019, 2022, 2025]
+
+dependencies: []

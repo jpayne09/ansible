@@ -1,0 +1,7 @@
+---
+# Production environment overrides
+target_environment: "prod"
+resource_prefix: "prod"
+
+# Production should always use STS
+aws_use_sts: true

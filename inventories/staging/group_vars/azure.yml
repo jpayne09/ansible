@@ -1,0 +1,5 @@
+---
+# Staging Azure overrides
+azure_resource_group: "rg-staging-lab"
+azure_region: "eastus2"
+vm_size: "Standard_D2s_v3"

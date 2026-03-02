@@ -1,0 +1,15 @@
+---
+# aws_ec2_provision role defaults
+# These are fallbacks — normally overridden by group_vars/all/aws_defaults.yml
+
+aws_region: "us-east-1"
+aws_vpc_cidr: "10.1.0.0/16"
+aws_subnet_cidr: "10.1.1.0/24"
+aws_vpc_name: "ansible-lab-vpc"
+aws_subnet_name: "ansible-lab-subnet"
+aws_igw_name: "ansible-lab-igw"
+aws_route_table_name: "ansible-lab-rt"
+aws_security_group_name: "ansible-lab-sg"
+ec2_key_pair_name: "ansible-lab-key"
+ec2_tags: {}
+ec2_instances: []

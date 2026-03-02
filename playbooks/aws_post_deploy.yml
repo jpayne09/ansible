@@ -11,9 +11,6 @@
   hosts: "{{ target_host | default('aws_windows') }}"
   gather_facts: false
 
-  vars_files:
-    - ../group_vars/aws_ec2.yml
-
   vars:
     ansible_connection: winrm
     ansible_winrm_transport: basic
@@ -21,7 +18,7 @@
     ansible_port: 5985
 
   roles:
-    - role: ../roles/win_domain_join
+    - role: win_domain_join
 
   tasks:
     - name: Run custom deployment verification script
@@ -57,15 +54,12 @@
   gather_facts: true
   become: true
 
-  vars_files:
-    - ../group_vars/aws_ec2.yml
-
   vars:
     ansible_connection: ssh
-    ansible_user: ubuntu
+    ansible_user: ec2-user
 
   roles:
-    - role: ../roles/linux_post_deploy
+    - role: linux_post_deploy
 
   tasks:
     - name: Display system info

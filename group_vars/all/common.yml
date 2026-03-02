@@ -1,0 +1,21 @@
+---
+# Common defaults shared across all environments and providers
+
+# Naming convention
+resource_prefix: "ansible-lab"
+
+# Standard tags applied to all resources
+common_tags:
+  ManagedBy: "ansible-awx"
+  Project: "homelab-demo"
+  Environment: "{{ target_environment | default('dev') }}"
+
+# Domain configuration (shared across AWS and Azure)
+domain_name: "lab.local"
+domain_admin_user: "LABLOCAL\\admin"
+domain_admin_password: "{{ vault_domain_admin_password | default('DomainP@ss123!') }}"
+domain_ou_path: "OU=Servers,DC=lab,DC=local"
+domain_controller_ip: "10.1.1.10"
+
+# Service account for Ansible management (created by user_data on Windows)
+svc_ansible_password: "{{ vault_svc_ansible_password | default('SvcP@ssw0rd1234!') }}"

@@ -1,0 +1,87 @@
+---
+# Launch EC2 instances from ec2_instances list
+
+- name: Launch EC2 instances
+  amazon.aws.ec2_instance:
+    name: "{{ item.name }}"
+    instance_type: "{{ item.instance_type }}"
+    image_id: "{{ item.ami_id }}"
+    key_name: "{{ item.key_pair }}"
+    vpc_subnet_id: "{{ subnet_result.subnet.id }}"
+    security_group: "{{ sg_result.group_id }}"
+    network:
+      assign_public_ip: true
+    volumes: "{{ item.volumes }}"
+    user_data: "{{ lookup('template', item.user_data_template) }}"
+    state: running
+    wait: true
+    tags: "{{ ec2_tags | combine({'Name': item.name}) | combine(item.extra_tags | default({})) }}"
+  loop: "{{ ec2_instances }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.os_type }})"
+  register: ec2_launch_results
+
+- name: Wait for Windows instances (WinRM)
+  ansible.builtin.wait_for:
+    host: "{{ item.instances[0].public_ip_address }}"
+    port: 5985
+    delay: 60
+    timeout: 600
+  loop: "{{ ec2_launch_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.item.os_type == 'windows'
+
+- name: Wait for Linux instances (SSH)
+  ansible.builtin.wait_for:
+    host: "{{ item.instances[0].public_ip_address }}"
+    port: 22
+    delay: 30
+    timeout: 300
+  loop: "{{ ec2_launch_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.item.os_type == 'linux'
+
+- name: Add Windows instances to in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ item.instances[0].public_ip_address }}"
+    groups: aws_windows
+    ansible_host: "{{ item.instances[0].public_ip_address }}"
+    ansible_user: "{{ item.item.admin_user }}"
+    ansible_password: "{{ item.item.admin_password | default(omit) }}"
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
+    instance_name: "{{ item.item.name }}"
+  loop: "{{ ec2_launch_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.item.os_type == 'windows'
+
+- name: Add Linux instances to in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ item.instances[0].public_ip_address }}"
+    groups: aws_linux
+    ansible_host: "{{ item.instances[0].public_ip_address }}"
+    ansible_user: "{{ item.item.admin_user }}"
+    ansible_connection: ssh
+    ansible_ssh_private_key_file: "/tmp/{{ ec2_key_pair_name }}.pem"
+    instance_name: "{{ item.item.name }}"
+  loop: "{{ ec2_launch_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.item.os_type == 'linux'
+
+- name: Display deployment summary
+  ansible.builtin.debug:
+    msg: |
+      Deployed {{ ec2_launch_results.results | length }} instance(s):
+      {% for result in ec2_launch_results.results %}
+        - {{ result.item.name }} ({{ result.item.os_type }})
+          Instance ID: {{ result.instances[0].instance_id }}
+          Public IP:   {{ result.instances[0].public_ip_address }}
+          Private IP:  {{ result.instances[0].private_ip_address }}
+          Volumes:     {{ result.item.volumes | length }}
+      {% endfor %}

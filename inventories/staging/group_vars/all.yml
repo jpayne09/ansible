@@ -1,0 +1,4 @@
+---
+# Staging environment overrides
+target_environment: "staging"
+resource_prefix: "staging-lab"
