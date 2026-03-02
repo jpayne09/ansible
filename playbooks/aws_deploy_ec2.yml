@@ -5,7 +5,7 @@
   connection: local
 
   vars_files:
-    - ../group_vars/aws_ec2.yml
+    - ../group_vars/Test-team/aws_ec2.yml
 
   tasks:
     - name: Debug - Verify AWS credentials loaded
