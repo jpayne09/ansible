@@ -13,7 +13,7 @@
     - ../group_vars/Test-team/aws_ec2.yml
 
   vars:
-    confirm_destroy: "no"
+    confirm_destroy: "yes"
 
   tasks:
     - name: Safety check - require explicit confirmation
