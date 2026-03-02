@@ -1,0 +1,175 @@
+---
+# Run AFTER azure_deploy_vm.yml — connects to the deployed Windows VM via WinRM
+# and simulates domain join + post-deploy configuration.
+#
+# Usage in AWX: Create a Workflow Template that chains:
+#   1. azure_deploy_vm.yml → 2. azure_domain_join.yml
+#
+# Or run standalone with the VM IP as extra var:
+#   ansible-playbook playbooks/azure_domain_join.yml -e "target_host=1.2.3.4"
+
+- name: Azure VM - Domain Join & Post-Deploy Configuration
+  hosts: "{{ target_host | default('azure_windows') }}"
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/azure_vms.yml
+
+  vars:
+    # Domain configuration — override via AWX extra vars or survey
+    domain_name: "lab.local"
+    domain_admin_user: "LABLOCAL\\admin"
+    domain_admin_password: "DomainP@ss123!"
+    domain_ou_path: "OU=Servers,DC=lab,DC=local"
+    domain_controller_ip: "10.0.1.10"
+
+    # Connection defaults (can be overridden by AWX credential injection)
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
+
+  tasks:
+    # ── Pre-flight Checks ─────────────────────────────────────────────
+    - name: Wait for WinRM to be available
+      ansible.builtin.wait_for_connection:
+        delay: 10
+        timeout: 300
+
+    - name: Gather Windows facts
+      ansible.windows.setup:
+
+    - name: Display current system info
+      ansible.builtin.debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_os_name | default('Windows') }}
+          IP: {{ ansible_ip_addresses | default(['unknown']) | join(', ') }}
+
+    # ── DNS Configuration ─────────────────────────────────────────────
+    - name: Set DNS to point to domain controller
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        dns_servers:
+          - "{{ domain_controller_ip }}"
+          - "8.8.8.8"
+
+    # ── Computer Rename ───────────────────────────────────────────────
+    - name: Set computer name
+      ansible.windows.win_hostname:
+        name: "{{ vm_name | upper | truncate(15, true, '') }}"
+      register: hostname_result
+
+    - name: Reboot after rename (if changed)
+      ansible.windows.win_reboot:
+        reboot_timeout: 300
+      when: hostname_result.reboot_required | default(false)
+
+    # ── Domain Join ───────────────────────────────────────────────────
+    - name: Join Active Directory domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ domain_admin_user }}"
+        domain_admin_password: "{{ domain_admin_password }}"
+        domain_ou_path: "{{ domain_ou_path }}"
+        state: domain
+      register: domain_join_result
+      ignore_errors: true
+
+    - name: Reboot after domain join
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: domain_join_result is changed
+
+    - name: Simulated domain join (when no DC available)
+      ansible.windows.win_powershell:
+        script: |
+          # Simulate domain join for lab/demo purposes
+          Write-Output "=== Simulated Domain Join ==="
+          Write-Output "Domain: {{ domain_name }}"
+          Write-Output "OU: {{ domain_ou_path }}"
+
+          # Set registry keys to simulate domain membership
+          $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
+          Set-ItemProperty -Path $regPath -Name "Domain" -Value "{{ domain_name }}"
+          Set-ItemProperty -Path $regPath -Name "NV Domain" -Value "{{ domain_name }}"
+
+          # Log the simulated join
+          $logEntry = "$(Get-Date) - Simulated domain join to {{ domain_name }} from Ansible AWX"
+          Add-Content -Path "C:\domain_join_log.txt" -Value $logEntry
+
+          Write-Output "Domain join simulation complete — registry updated"
+      when: domain_join_result is failed
+      register: simulated_join
+
+    # ── Post-Deploy Software Installation ─────────────────────────────
+    - name: Install Chocolatey package manager
+      ansible.windows.win_powershell:
+        script: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+              Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          }
+
+    - name: Install common software via Chocolatey
+      chocolatey.chocolatey.win_chocolatey:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - googlechrome
+        - 7zip
+        - notepadplusplus
+        - git
+      ignore_errors: true
+
+    # ── Security Hardening ────────────────────────────────────────────
+    - name: Configure Windows Firewall - enable domain profile
+      ansible.windows.win_powershell:
+        script: |
+          Set-NetFirewallProfile -Profile Domain -Enabled True
+          Set-NetFirewallProfile -Profile Private -Enabled True
+          Set-NetFirewallProfile -Profile Public -Enabled True
+
+    - name: Disable SMBv1
+      ansible.windows.win_optional_feature:
+        name: SMB1Protocol
+        state: absent
+
+    - name: Enable Windows Update service
+      ansible.windows.win_service:
+        name: wuauserv
+        start_mode: auto
+        state: started
+
+    # ── Custom Script Execution ───────────────────────────────────────
+    - name: Run custom post-deploy PowerShell script
+      ansible.windows.win_powershell:
+        script: |
+          Write-Output "=== Post-Deploy Configuration ==="
+          Write-Output "Hostname: $env:COMPUTERNAME"
+          Write-Output "Domain: {{ domain_name }}"
+          Write-Output "Deployed by: Ansible AWX"
+          Write-Output "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+
+          # Create standard directories
+          $dirs = @("C:\Scripts", "C:\Logs", "C:\Temp")
+          foreach ($dir in $dirs) {
+              if (-not (Test-Path $dir)) {
+                  New-Item -Path $dir -ItemType Directory | Out-Null
+                  Write-Output "Created: $dir"
+              }
+          }
+
+          # Set up event log source for custom app logging
+          if (-not [System.Diagnostics.EventLog]::SourceExists("AnsibleDeploy")) {
+              New-EventLog -LogName Application -Source "AnsibleDeploy"
+          }
+          Write-EventLog -LogName Application -Source "AnsibleDeploy" -EventId 1000 -EntryType Information -Message "Server configured by Ansible AWX"
+
+          Write-Output "=== Post-Deploy Complete ==="
+      register: post_deploy_result
+
+    - name: Display post-deploy results
+      ansible.builtin.debug:
+        msg: "{{ post_deploy_result.output | default('Script completed') }}"

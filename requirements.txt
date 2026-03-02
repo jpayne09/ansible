@@ -23,3 +23,11 @@ azure-mgmt-storage
 azure-mgmt-trafficmanager
 azure-mgmt-web
 msrestazure>=0.6.4
+
+# AWS SDK
+boto3>=1.28.0
+botocore>=1.31.0
+
+# WinRM (for managing Windows hosts)
+pywinrm>=0.4.3
+requests-credssp>=2.0.0

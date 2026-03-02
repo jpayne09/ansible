@@ -1,0 +1,192 @@
+---
+# Role: linux_post_deploy
+# Post-deployment configuration for Linux servers (Ubuntu/Debian).
+# Includes system updates, hardening, and simulated realm/domain join.
+#
+# Required variables:
+#   domain_name, domain_controller_ip (for realm join simulation)
+
+- name: Wait for SSH connectivity
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 300
+
+- name: Gather facts
+  ansible.builtin.setup:
+
+- name: Display system info
+  ansible.builtin.debug:
+    msg: |
+      Hostname: {{ ansible_hostname }}
+      OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      IP: {{ ansible_default_ipv4.address | default('unknown') }}
+      Kernel: {{ ansible_kernel }}
+
+# ── System Updates ────────────────────────────────────────────────
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Upgrade all packages
+  ansible.builtin.apt:
+    upgrade: safe
+  register: upgrade_result
+
+# ── Essential Packages ────────────────────────────────────────────
+- name: Install common packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - git
+      - vim
+      - htop
+      - net-tools
+      - jq
+      - unzip
+      - tree
+      - tmux
+      - fail2ban
+      - ufw
+    state: present
+
+# ── User & Access Setup ──────────────────────────────────────────
+- name: Create service account
+  ansible.builtin.user:
+    name: svc_ansible
+    comment: "Ansible Service Account"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Set up SSH key for service account
+  ansible.posix.authorized_key:
+    user: svc_ansible
+    key: "{{ lookup('env', 'ANSIBLE_SSH_PUBLIC_KEY') | default('ssh-rsa PLACEHOLDER-Replace-With-Real-Key', true) }}"
+    state: present
+  ignore_errors: true
+
+# ── Hostname Configuration ───────────────────────────────────────
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname_short }}"
+
+# ── Simulated Realm/Domain Join ──────────────────────────────────
+- name: Install realm join packages
+  ansible.builtin.apt:
+    name:
+      - realmd
+      - sssd
+      - sssd-tools
+      - adcli
+      - krb5-user
+      - packagekit
+    state: present
+  ignore_errors: true
+
+- name: Attempt real realm join
+  ansible.builtin.command:
+    cmd: >
+      realm join --user="{{ domain_admin_user | default('admin') }}"
+      "{{ domain_name }}"
+  environment:
+    PASSWD: "{{ domain_admin_password | default('') }}"
+  register: realm_join_result
+  ignore_errors: true
+  changed_when: realm_join_result.rc == 0
+
+- name: Simulate realm join (when DC unreachable)
+  ansible.builtin.copy:
+    content: |
+      # Simulated Domain Join Configuration
+      # Domain: {{ domain_name }}
+      # DC: {{ domain_controller_ip | default('not set') }}
+      # Joined: {{ ansible_date_time.iso8601 }}
+      # Source: Ansible AWX
+
+      [sssd]
+      domains = {{ domain_name }}
+      config_file_version = 2
+      services = nss, pam
+
+      [domain/{{ domain_name }}]
+      ad_domain = {{ domain_name }}
+      krb5_realm = {{ domain_name | upper }}
+      realmd_tags = manages-system joined-with-adcli
+      cache_credentials = True
+      id_provider = ad
+      access_provider = ad
+    dest: /etc/sssd/sssd.conf.simulated
+    mode: "0600"
+  when: realm_join_result is failed
+
+- name: Log simulated join
+  ansible.builtin.copy:
+    content: |
+      {
+        "hostname": "{{ ansible_hostname }}",
+        "domain": "{{ domain_name }}",
+        "join_type": "{{ 'real' if realm_join_result is changed else 'simulated' }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "source": "AnsibleAWX"
+      }
+    dest: /var/log/domain_join.json
+    mode: "0644"
+
+# ── Firewall Configuration ───────────────────────────────────────
+- name: Configure UFW - allow SSH
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: Configure UFW - enable
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+# ── SSH Hardening ─────────────────────────────────────────────────
+- name: Harden SSH configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+  notify: Restart SSH
+
+# ── Standard Directories ─────────────────────────────────────────
+- name: Create standard directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/scripts
+    - /var/log/ansible
+    - /opt/apps
+
+- name: Write deployment receipt
+  ansible.builtin.copy:
+    content: |
+      Deployment Complete
+      ===================
+      Hostname: {{ ansible_hostname }}
+      OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      Domain: {{ domain_name }} ({{ 'joined' if realm_join_result is changed else 'simulated' }})
+      Packages upgraded: {{ upgrade_result.stdout_lines | default([]) | length }}
+      Deployed by: Ansible AWX
+      Timestamp: {{ ansible_date_time.iso8601 }}
+    dest: /var/log/ansible/deployment_receipt.txt
+    mode: "0644"
+
+handlers:
+  - name: Restart SSH
+    ansible.builtin.service:
+      name: ssh
+      state: restarted

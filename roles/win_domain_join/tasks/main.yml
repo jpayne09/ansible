@@ -1,0 +1,146 @@
+---
+# Role: win_domain_join
+# Joins a Windows server to an AD domain (or simulates it for lab use).
+# Works for both Azure and AWS Windows VMs.
+#
+# Required variables:
+#   domain_name, domain_admin_user, domain_admin_password,
+#   domain_ou_path, domain_controller_ip
+
+- name: Wait for WinRM connectivity
+  ansible.builtin.wait_for_connection:
+    delay: 10
+    timeout: 300
+
+- name: Gather Windows facts
+  ansible.windows.setup:
+
+- name: Display pre-join system info
+  ansible.builtin.debug:
+    msg: |
+      Hostname: {{ ansible_hostname }}
+      Current Domain: {{ ansible_windows_domain | default('WORKGROUP') }}
+      Target Domain: {{ domain_name }}
+
+# ── DNS Configuration ─────────────────────────────────────────────
+- name: Configure DNS to domain controller
+  ansible.windows.win_dns_client:
+    adapter_names: "*"
+    dns_servers:
+      - "{{ domain_controller_ip }}"
+      - "8.8.8.8"
+
+# ── Computer Name ─────────────────────────────────────────────────
+- name: Set computer name to match VM name
+  ansible.windows.win_hostname:
+    name: "{{ inventory_hostname_short | upper | truncate(15, true, '') }}"
+  register: hostname_result
+
+- name: Reboot after hostname change
+  ansible.windows.win_reboot:
+    reboot_timeout: 300
+  when: hostname_result.reboot_required | default(false)
+
+# ── Domain Join (real) ────────────────────────────────────────────
+- name: Join Active Directory domain
+  microsoft.ad.membership:
+    dns_domain_name: "{{ domain_name }}"
+    domain_admin_user: "{{ domain_admin_user }}"
+    domain_admin_password: "{{ domain_admin_password }}"
+    domain_ou_path: "{{ domain_ou_path }}"
+    state: domain
+  register: domain_join_result
+  ignore_errors: true
+
+- name: Reboot after domain join
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+  when: domain_join_result is changed
+
+# ── Domain Join (simulated fallback) ──────────────────────────────
+- name: Simulate domain join when DC is unreachable
+  ansible.windows.win_powershell:
+    script: |
+      Write-Output "=== Simulated Domain Join ==="
+      Write-Output "Target Domain: {{ domain_name }}"
+      Write-Output "Target OU: {{ domain_ou_path }}"
+      Write-Output "DC IP: {{ domain_controller_ip }}"
+
+      # Write domain info to registry (simulates join)
+      $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
+      Set-ItemProperty -Path $regPath -Name "Domain" -Value "{{ domain_name }}"
+      Set-ItemProperty -Path $regPath -Name "NV Domain" -Value "{{ domain_name }}"
+
+      # Create a local group to simulate domain group membership
+      $groupName = "DomainSimulated"
+      if (-not (Get-LocalGroup -Name $groupName -ErrorAction SilentlyContinue)) {
+          New-LocalGroup -Name $groupName -Description "Simulated domain group"
+      }
+
+      # Log the join attempt
+      $log = @{
+          Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          Action    = "SimulatedDomainJoin"
+          Domain    = "{{ domain_name }}"
+          OU        = "{{ domain_ou_path }}"
+          Source    = "AnsibleAWX"
+      }
+      $log | ConvertTo-Json | Out-File "C:\domain_join_log.json" -Append
+
+      Write-Output "Simulation complete — see C:\domain_join_log.json"
+  when: domain_join_result is failed
+
+# ── Post-Join Software ────────────────────────────────────────────
+- name: Install Chocolatey
+  ansible.windows.win_powershell:
+    script: |
+      Set-ExecutionPolicy Bypass -Scope Process -Force
+      [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+      if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+          Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      }
+
+- name: Install standard software suite
+  chocolatey.chocolatey.win_chocolatey:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - googlechrome
+    - 7zip
+    - notepadplusplus
+    - git
+    - vscode
+  ignore_errors: true
+
+# ── Security Baseline ─────────────────────────────────────────────
+- name: Disable SMBv1
+  ansible.windows.win_optional_feature:
+    name: SMB1Protocol
+    state: absent
+
+- name: Enable Windows Firewall on all profiles
+  ansible.windows.win_powershell:
+    script: |
+      Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True
+
+- name: Create standard directories
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - C:\Scripts
+    - C:\Logs
+    - C:\Temp
+
+- name: Log deployment completion
+  ansible.windows.win_powershell:
+    script: |
+      $info = @{
+          Hostname  = $env:COMPUTERNAME
+          Domain    = "{{ domain_name }}"
+          JoinType  = "{{ 'real' if domain_join_result is changed else 'simulated' }}"
+          Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          Source    = "AnsibleAWX"
+      }
+      $info | ConvertTo-Json | Out-File "C:\Logs\deployment_complete.json"
+      Write-Output ($info | ConvertTo-Json)

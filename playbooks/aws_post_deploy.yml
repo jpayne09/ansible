@@ -1,0 +1,78 @@
+---
+# Run AFTER aws_deploy_ec2.yml — connects to deployed EC2 instances
+# and performs domain join + post-deploy configuration.
+#
+# Supports both Windows (WinRM) and Linux (SSH) targets.
+#
+# Usage in AWX: Chain in a Workflow Template:
+#   1. aws_deploy_ec2.yml → 2. aws_post_deploy.yml
+
+- name: AWS EC2 - Windows Post-Deploy & Domain Join
+  hosts: "{{ target_host | default('aws_windows') }}"
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/aws_ec2.yml
+
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
+
+  roles:
+    - role: ../roles/win_domain_join
+
+  tasks:
+    - name: Run custom deployment verification script
+      ansible.windows.win_powershell:
+        script: |
+          Write-Output "=== AWS EC2 Post-Deploy Verification ==="
+          Write-Output "Instance Hostname: $env:COMPUTERNAME"
+          Write-Output "Cloud Provider: AWS"
+          Write-Output "Region: {{ aws_region }}"
+          Write-Output "Instance Type: {{ ec2_instance_type }}"
+          Write-Output "Deployed by: Ansible AWX"
+          Write-Output "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+
+          # Verify WinRM is properly configured
+          $winrm = Get-Service WinRM
+          Write-Output "WinRM Service: $($winrm.Status)"
+
+          # Check installed software
+          $software = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
+                      Select-Object DisplayName, DisplayVersion |
+                      Where-Object { $_.DisplayName } |
+                      Sort-Object DisplayName |
+                      Select-Object -First 10
+          Write-Output "`nInstalled Software (top 10):"
+          $software | ForEach-Object { Write-Output "  - $($_.DisplayName) v$($_.DisplayVersion)" }
+
+          Write-Output "`n=== Verification Complete ==="
+
+---
+# Optional: Linux EC2 post-deploy play (for Ubuntu/Amazon Linux instances)
+- name: AWS EC2 - Linux Post-Deploy Configuration
+  hosts: "{{ target_linux_host | default('aws_linux') }}"
+  gather_facts: true
+  become: true
+
+  vars_files:
+    - ../group_vars/aws_ec2.yml
+
+  vars:
+    ansible_connection: ssh
+    ansible_user: ubuntu
+
+  roles:
+    - role: ../roles/linux_post_deploy
+
+  tasks:
+    - name: Display system info
+      ansible.builtin.debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          IP: {{ ansible_default_ipv4.address | default('unknown') }}
+          Cloud: AWS ({{ aws_region }})
+          Deployed by: Ansible AWX

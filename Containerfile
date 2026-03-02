@@ -3,8 +3,11 @@ FROM quay.io/ansible/creator-ee:latest
 # Install system dependencies
 USER root
 
-# Install Azure CLI
-RUN pip install --no-cache-dir azure-cli
+# Install Azure CLI + AWS CLI
+RUN pip install --no-cache-dir azure-cli awscli boto3 botocore
+
+# Install WinRM support
+RUN pip install --no-cache-dir pywinrm requests-credssp
 
 # Install Python dependencies from requirements.txt
 COPY requirements.txt /tmp/requirements.txt
@@ -91,4 +94,5 @@ RUN COLLECTION_PATH=$(find / -name "azcollection" -type d 2>/dev/null | grep "an
     fi
 
 # Verify installations
-RUN az --version && ansible --version && ansible-galaxy collection list | grep azure
+RUN az --version && aws --version && ansible --version && \
+    ansible-galaxy collection list | grep -E "azure|amazon|windows|microsoft"

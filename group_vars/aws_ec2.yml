@@ -1,0 +1,44 @@
+---
+# AWS Credentials - AWX injects these via environment variables
+# Override by setting in AAP Job Template Extra Variables
+aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+
+# AWS Region & Networking
+aws_region: "us-east-1"
+aws_vpc_cidr: "10.1.0.0/16"
+aws_subnet_cidr: "10.1.1.0/24"
+aws_vpc_name: "ansible-lab-vpc"
+aws_subnet_name: "ansible-lab-subnet"
+aws_igw_name: "ansible-lab-igw"
+aws_route_table_name: "ansible-lab-rt"
+aws_security_group_name: "ansible-lab-sg"
+
+# EC2 Instance Configuration — Windows Server 2022
+ec2_instance_name: "ansible-win-server"
+ec2_instance_type: "t3.medium"
+ec2_ami_id: "ami-0f9c44e98edf38a2b"  # Windows Server 2022 Base (us-east-1) — update for your region
+ec2_key_pair_name: "ansible-lab-key"
+ec2_root_volume_size: 50
+
+# EC2 Instance Configuration — Linux (Ubuntu 24.04)
+ec2_linux_instance_name: "ansible-linux-server"
+ec2_linux_ami_id: "ami-0c7217cdde317cfec"  # Ubuntu 24.04 LTS (us-east-1) — update for your region
+ec2_linux_instance_type: "t3.micro"
+
+# WinRM Configuration for Windows EC2
+ec2_win_admin_user: "Administrator"
+ec2_win_admin_password: "P@ssw0rd1234!"
+
+# Tags
+ec2_tags:
+  Environment: "lab"
+  ManagedBy: "ansible-awx"
+  Project: "homelab-demo"
+
+# Domain Join Configuration (simulated)
+domain_name: "lab.local"
+domain_admin_user: "LABLOCAL\\admin"
+domain_admin_password: "DomainP@ss123!"
+domain_ou_path: "OU=Servers,DC=lab,DC=local"
+domain_controller_ip: "10.1.1.10"

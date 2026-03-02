@@ -1,0 +1,44 @@
+---
+# AWS EC2 Dynamic Inventory Plugin
+# AWX will use this to auto-discover EC2 instances tagged by our playbooks.
+#
+# In AWX: Create an Inventory → Add Source → "Sourced from a Project"
+# Point to this file and attach AWS credentials.
+
+plugin: amazon.aws.ec2
+
+regions:
+  - us-east-1
+
+filters:
+  "tag:ManagedBy":
+    - "ansible-awx"
+  "tag:Project":
+    - "homelab-demo"
+  instance-state-name:
+    - running
+
+keyed_groups:
+  # Group by OS tag (e.g., group "tag_OS_Windows", "tag_OS_Linux")
+  - key: tags.OS
+    prefix: "os"
+    separator: "_"
+  # Group by environment tag
+  - key: tags.Environment
+    prefix: "env"
+    separator: "_"
+
+hostnames:
+  # Use public IP as the hostname (for external access)
+  - public-ip-address
+  # Fallback to private IP
+  - private-ip-address
+
+compose:
+  # Set connection vars based on OS tag
+  ansible_host: public_ip_address
+  ansible_connection: "'winrm' if tags.get('OS', '') == 'Windows' else 'ssh'"
+  ansible_user: "'Administrator' if tags.get('OS', '') == 'Windows' else 'ubuntu'"
+  ansible_port: "5985 if tags.get('OS', '') == 'Windows' else 22"
+  ansible_winrm_transport: "'basic' if tags.get('OS', '') == 'Windows' else omit"
+  ansible_winrm_server_cert_validation: "'ignore' if tags.get('OS', '') == 'Windows' else omit"

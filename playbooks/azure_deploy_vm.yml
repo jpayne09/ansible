@@ -1,0 +1,158 @@
+---
+- name: Deploy Azure Windows VM
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/azure_vms.yml
+
+  tasks:
+    - name: Debug - Check credentials loaded from AWX
+      ansible.builtin.debug:
+        msg: |
+          Subscription ID: {{ azure_subscription_id | default('NOT SET') }}
+          Client ID: {{ azure_client_id | default('NOT SET') }}
+          Tenant ID: {{ azure_tenant_id | default('NOT SET') }}
+
+    - name: Create resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        subscription_id: "{{ azure_subscription_id }}"
+        name: "{{ azure_resource_group }}"
+        location: "{{ azure_region }}"
+      register: rg_result
+
+    - name: Create virtual network
+      azure.azcollection.azure_rm_virtualnetwork:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ virtual_network_name }}"
+        address_prefixes_cidr:
+          - "10.0.0.0/16"
+
+    - name: Create subnet
+      azure.azcollection.azure_rm_subnet:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        virtual_network_name: "{{ virtual_network_name }}"
+        name: "{{ subnet_name }}"
+        address_prefix_cidr: "10.0.1.0/24"
+
+    - name: Create network security group
+      azure.azcollection.azure_rm_securitygroup:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ nsg_name }}"
+        rules:
+          - name: AllowRDP
+            protocol: Tcp
+            destination_port_range: 3389
+            access: Allow
+            priority: 100
+            direction: Inbound
+          - name: AllowWinRM
+            protocol: Tcp
+            destination_port_range: 5985
+            access: Allow
+            priority: 101
+            direction: Inbound
+          - name: AllowWinRMHTTPS
+            protocol: Tcp
+            destination_port_range: 5986
+            access: Allow
+            priority: 102
+            direction: Inbound
+
+    - name: Create public IP address
+      azure.azcollection.azure_rm_publicipaddress:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ public_ip_name }}"
+        allocation_method: "Static"
+      register: public_ip
+
+    - name: Create network interface
+      azure.azcollection.azure_rm_networkinterface:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ nic_name }}"
+        virtual_network_name: "{{ virtual_network_name }}"
+        subnet_name: "{{ subnet_name }}"
+        security_group_name: "{{ nsg_name }}"
+        ip_configurations:
+          - name: ipconfig1
+            private_ip_allocation_method: "Dynamic"
+            public_ip_address_name: "{{ public_ip_name }}"
+            primary: true
+
+    - name: Create Windows virtual machine
+      azure.azcollection.azure_rm_virtualmachine:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ vm_name }}"
+        vm_size: "{{ vm_size }}"
+        admin_username: "{{ vm_admin_user }}"
+        admin_password: "{{ vm_admin_password }}"
+        network_interfaces: "{{ nic_name }}"
+        os_type: Windows
+        image:
+          offer: "{{ vm_image_offer }}"
+          publisher: "{{ vm_image_publisher }}"
+          sku: "{{ vm_image_sku }}"
+          version: "{{ vm_image_version }}"
+        os_disk_size_gb: "{{ vm_os_disk_size_gb }}"
+        managed_disk_type: "Premium_LRS"
+      register: vm_result
+
+    - name: Enable WinRM on Azure VM via custom script extension
+      azure.azcollection.azure_rm_virtualmachineextension:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "EnableWinRM"
+        virtual_machine_name: "{{ vm_name }}"
+        publisher: "Microsoft.Compute"
+        virtual_machine_extension_type: "CustomScriptExtension"
+        type_handler_version: "1.10"
+        settings:
+          commandToExecute: >-
+            powershell -ExecutionPolicy Unrestricted -Command "
+            winrm quickconfig -q;
+            winrm set winrm/config/service '@{AllowUnencrypted=\"true\"}';
+            winrm set winrm/config/service/auth '@{Basic=\"true\"}';
+            New-NetFirewallRule -DisplayName 'WinRM HTTP' -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow
+            "
+
+    - name: Get VM public IP
+      azure.azcollection.azure_rm_publicipaddress_info:
+        subscription_id: "{{ azure_subscription_id }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ public_ip_name }}"
+      register: public_ip_info
+
+    - name: Display VM information
+      ansible.builtin.debug:
+        msg: |
+          ✓ Azure Windows VM Deployment Complete!
+
+          Resource Group: {{ azure_resource_group }}
+          VM Name: {{ vm_name }}
+          Location: {{ azure_region }}
+          Size: {{ vm_size }}
+          Admin User: {{ vm_admin_user }}
+          Public IP: {{ public_ip_info.publicipaddresses[0].ip_address }}
+
+          To connect:
+            RDP: {{ public_ip_info.publicipaddresses[0].ip_address }}:3389
+            WinRM: {{ public_ip_info.publicipaddresses[0].ip_address }}:5985
+            Username: {{ vm_admin_user }}
+
+    - name: Add Azure VM to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ public_ip_info.publicipaddresses[0].ip_address }}"
+        groups: azure_windows
+        ansible_host: "{{ public_ip_info.publicipaddresses[0].ip_address }}"
+        ansible_user: "{{ vm_admin_user }}"
+        ansible_password: "{{ vm_admin_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5985
